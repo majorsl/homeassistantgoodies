@@ -1,0 +1,6 @@
+# homeassistantgoodies
+Scripts &amp; things that people might find useful...
+
+These are some things I've done for *my* Home Assistant, they may not work for *your* Home Assistant without changes.
+
+I'm posting them here for my own archives and for those that might find them useful.  Sorry, I can't help you with issues you run into as these are not intended to be for general production in other's Home Assistant installs, but maybe you'll get some ideas...
