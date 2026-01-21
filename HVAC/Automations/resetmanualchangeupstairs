@@ -1,0 +1,22 @@
+alias: "[Smart Climate] Reset Upstairs Manual Override"
+description: Resets manual override after timer finishes or on restart if timer is idle
+triggers:
+  - event_type: timer.finished
+    event_data:
+      entity_id: timer.climate_upstairs_manual_override
+    trigger: event
+  - event: start
+    trigger: homeassistant
+conditions:
+  - condition: state
+    entity_id: timer.climate_upstairs_manual_override
+    state: idle
+    enabled: false
+  - condition: state
+    entity_id: input_boolean.climate_upstairs_manual_override
+    state: "on"
+actions:
+  - target:
+      entity_id: input_boolean.climate_upstairs_manual_override
+    action: input_boolean.turn_off
+mode: single
