@@ -1,0 +1,354 @@
+alias: "[Smart Climate] Control - Upstairs"
+description: >
+  Adaptive climate automation for Ecobee upstairs: occupancy, presence, sleep
+  window, outdoor temp, manual override, and mode booleans.
+triggers:
+  - entity_id:
+      - binary_sensor.upstairs_motion_sensors
+    trigger: state
+  - trigger: time_pattern
+    hours: /1
+  - trigger: state
+    entity_id:
+      - binary_sensor.upstairs_doors_and_windows
+    for:
+      hours: 0
+      minutes: 3
+      seconds: 0
+    from: "off"
+    to: "on"
+  - trigger: state
+    entity_id:
+      - binary_sensor.upstairs_doors_and_windows
+    for:
+      hours: 0
+      minutes: 1
+      seconds: 15
+    from: "on"
+    to: "off"
+  - trigger: state
+    entity_id:
+      - binary_sensor.entry_pir_sensor_home_security_motion_detected
+  - trigger: state
+    entity_id:
+      - input_boolean.climate_upstairs_manual_override
+    to: "off"
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 10
+conditions:
+  - condition: state
+    entity_id: input_boolean.climate_upstairs_manual_override
+    state: "off"
+actions:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ not door_open }}"
+        sequence:
+          - variables:
+              hvac_mode: |-
+                {{ 'heat' if outdoor_temp <= 60 else
+                   'cool' if outdoor_temp >= 70 else
+                   'heat_cool' }}
+          - target:
+              entity_id: input_boolean.climate_upstairs_recently_changed
+            action: input_boolean.turn_on
+          - target:
+              entity_id: "{{ climate_entity }}"
+            data:
+              hvac_mode: "{{ hvac_mode }}"
+            action: climate.set_hvac_mode
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ door_open }}"
+        sequence:
+          - target:
+              entity_id: input_boolean.climate_upstairs_recently_changed
+            action: input_boolean.turn_on
+          - target:
+              entity_id: "{{ climate_entity }}"
+            data:
+              hvac_mode: "off"
+            action: climate.set_hvac_mode
+          - target:
+              entity_id:
+                - input_boolean.climate_upstairs_home
+                - input_boolean.climate_upstairs_away
+                - input_boolean.climate_upstairs_sleep
+            action: input_boolean.turn_off
+      - conditions:
+          - condition: template
+            value_template: "{{ is_state('group.presence_all_home', 'home') }}"
+        sequence:
+          - variables:
+              occupied_any: "{{ is_state('binary_sensor.upstairs_motion_sensors', 'on') }}"
+              heat: |-
+                {% if in_sleep_window %}
+                  {{ setpoints.sleep.heat + adjust }}
+                {% else %}
+                  {% if occupied_any %}
+                    {{ setpoints.home.heat + adjust }}
+                  {% else %}
+                    {{ setpoints.home.heat - 3 + adjust }}
+                  {% endif %}
+                {% endif %}
+              cool: |-
+                {% if in_sleep_window %}
+                  {{ setpoints.sleep.cool + adjust }}
+                {% else %}
+                  {% if occupied_any %}
+                    {{ setpoints.home.cool + adjust }}
+                  {% else %}
+                    {{ setpoints.home.cool + 3 + adjust }}
+                  {% endif %}
+                {% endif %}
+              current_mode: "{{ states('climate.upstairs_2') }}"
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ current_mode in ['auto', 'heat_cool'] }}"
+                sequence:
+                  - target:
+                      entity_id: input_boolean.climate_upstairs_recently_changed
+                    action: input_boolean.turn_on
+                  - target:
+                      entity_id: "{{ climate_entity }}"
+                    data:
+                      target_temp_low: "{{ heat }}"
+                      target_temp_high: "{{ cool }}"
+                    action: climate.set_temperature
+              - conditions:
+                  - condition: template
+                    value_template: "{{ current_mode == 'heat' }}"
+                sequence:
+                  - target:
+                      entity_id: input_boolean.climate_upstairs_recently_changed
+                    action: input_boolean.turn_on
+                  - target:
+                      entity_id: "{{ climate_entity }}"
+                    data:
+                      temperature: "{{ heat }}"
+                    action: climate.set_temperature
+              - conditions:
+                  - condition: template
+                    value_template: "{{ current_mode == 'cool' }}"
+                sequence:
+                  - target:
+                      entity_id: input_boolean.climate_upstairs_recently_changed
+                    action: input_boolean.turn_on
+                  - target:
+                      entity_id: "{{ climate_entity }}"
+                    data:
+                      temperature: "{{ cool }}"
+                    action: climate.set_temperature
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ in_sleep_window }}"
+                sequence:
+                  - target:
+                      entity_id: input_boolean.climate_upstairs_sleep
+                    action: input_boolean.turn_on
+                  - target:
+                      entity_id:
+                        - input_boolean.climate_upstairs_home
+                        - input_boolean.climate_upstairs_away
+                    action: input_boolean.turn_off
+              - conditions:
+                  - condition: template
+                    value_template: "{{ not in_sleep_window }}"
+                sequence:
+                  - target:
+                      entity_id: input_boolean.climate_upstairs_home
+                    action: input_boolean.turn_on
+                  - target:
+                      entity_id:
+                        - input_boolean.climate_upstairs_away
+                        - input_boolean.climate_upstairs_sleep
+                    action: input_boolean.turn_off
+      - conditions:
+          - condition: template
+            value_template: "{{ not is_state('group.presence_all_home', 'home') }}"
+        sequence:
+          - variables:
+              heat: "{{ setpoints.away.heat + adjust }}"
+              cool: "{{ setpoints.away.cool + adjust }}"
+              current_mode: "{{ states('climate.upstairs_2') }}"
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ current_mode in ['auto', 'heat_cool'] }}"
+                sequence:
+                  - target:
+                      entity_id: input_boolean.climate_upstairs_recently_changed
+                    action: input_boolean.turn_on
+                  - target:
+                      entity_id: "{{ climate_entity }}"
+                    data:
+                      target_temp_low: "{{ heat }}"
+                      target_temp_high: "{{ cool }}"
+                    action: climate.set_temperature
+              - conditions:
+                  - condition: template
+                    value_template: "{{ current_mode == 'heat' }}"
+                sequence:
+                  - target:
+                      entity_id: input_boolean.climate_upstairs_recently_changed
+                    action: input_boolean.turn_on
+                  - target:
+                      entity_id: "{{ climate_entity }}"
+                    data:
+                      temperature: "{{ heat }}"
+                    action: climate.set_temperature
+              - conditions:
+                  - condition: template
+                    value_template: "{{ current_mode == 'cool' }}"
+                sequence:
+                  - target:
+                      entity_id: input_boolean.climate_upstairs_recently_changed
+                    action: input_boolean.turn_on
+                  - target:
+                      entity_id: "{{ climate_entity }}"
+                    data:
+                      temperature: "{{ cool }}"
+                    action: climate.set_temperature
+          - target:
+              entity_id: input_boolean.climate_upstairs_away
+            action: input_boolean.turn_on
+          - target:
+              entity_id:
+                - input_boolean.climate_upstairs_home
+                - input_boolean.climate_upstairs_sleep
+            action: input_boolean.turn_off
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 10
+  - action: input_boolean.turn_off
+    target:
+      entity_id: input_boolean.climate_upstairs_recently_changed
+  - data:
+      title: Smart Climate Upstairs Debug
+      message: >
+        🧠 **Smart Climate Upstairs Debug**
+
+
+        **Triggered:** {{ now() }}
+
+        **Trigger Source:** {{ trigger.entity_id if trigger.entity_id is defined
+        else trigger.platform }}
+
+
+        **Presence Home:** {{ states('group.presence_all_home') }}
+
+        **Door Open:** {{ door_open }}
+
+        **Occupied:** {{ is_state('binary_sensor.upstairs_motion_sensors', 'on')
+        }}
+
+        **Outdoor Temp:** {{ outdoor_temp }}°F
+
+        **Manual Override:** {{
+        is_state('input_boolean.climate_upstairs_manual_override','on') }}
+
+        **Sleep Window:** {{ in_sleep_window }}
+
+
+        ---
+
+        **Adjustment Details**
+
+        - Adjustment = {{ adjust }} ( +2 if outdoor <25°F, -2 if >85°F, else 0 )
+
+        - Mode = {% if in_sleep_window %}Sleep{% elif
+        is_state('group.presence_all_home','home') %}Home{% else %}Away{% endif
+        %}
+
+        - Occupancy = {% if
+        is_state('binary_sensor.upstairs_motion_sensors','on') %}Occupied{% else
+        %}Unoccupied{% endif %}
+
+
+        ---
+
+        **Setpoint Math**
+
+
+        {% if in_sleep_window %}
+
+        Sleep mode active → Base Heat {{ setpoints.sleep.heat }}°F + Adj {{
+        adjust }} → **{{ setpoints.sleep.heat + adjust }}°F**
+
+        Sleep mode active → Base Cool {{ setpoints.sleep.cool }}°F + Adj {{
+        adjust }} → **{{ setpoints.sleep.cool + adjust }}°F**
+
+
+        {% elif is_state('group.presence_all_home','home') %}
+          {% if is_state('binary_sensor.upstairs_motion_sensors','on') %}
+        Home & Occupied → Base Heat {{ setpoints.home.heat }}°F + Adj {{ adjust
+        }} → **{{ setpoints.home.heat + adjust }}°F**
+
+        Home & Occupied → Base Cool {{ setpoints.home.cool }}°F + Adj {{ adjust
+        }} → **{{ setpoints.home.cool + adjust }}°F**
+          {% else %}
+        Home & Unoccupied → Base Heat {{ setpoints.home.heat }}°F -3 + Adj {{
+        adjust }} → **{{ setpoints.home.heat - 3 + adjust }}°F**
+
+        Home & Unoccupied → Base Cool {{ setpoints.home.cool }}°F +3 + Adj {{
+        adjust }} → **{{ setpoints.home.cool + 3 + adjust }}°F**
+          {% endif %}
+
+        {% else %}
+
+        Away mode → Base Heat {{ setpoints.away.heat }}°F + Adj {{ adjust }} →
+        **{{ setpoints.away.heat + adjust }}°F**
+
+        Away mode → Base Cool {{ setpoints.away.cool }}°F + Adj {{ adjust }} →
+        **{{ setpoints.away.cool + adjust }}°F**
+
+        {% endif %}
+
+
+        ---
+
+        **Final Setpoints**
+
+        - Heat = {{ heat }}°F
+
+        - Cool = {{ cool }}°F
+
+        - HVAC Mode = {{ states('climate.upstairs_2') }}
+    action: persistent_notification.create
+    enabled: false
+variables:
+  climate_entity: climate.upstairs_2
+  outdoor_temp: >-
+    {{ states('sensor.weathersense_feels_like_temperature_outside') | float(0)
+    }}
+  door_open: "{{ is_state('binary_sensor.upstairs_doors_and_windows', 'on') }}"
+  sleep_start: "20:45:00"
+  sleep_end: "06:45:00"
+  current_time: "{{ now().time() }}"
+  sleep_start_time: "{{ strptime(sleep_start, '%H:%M:%S').time() }}"
+  sleep_end_time: "{{ strptime(sleep_end, '%H:%M:%S').time() }}"
+  in_sleep_window: |-
+    {% if sleep_start_time <= sleep_end_time %}
+      {{ sleep_start_time <= current_time <= sleep_end_time }}
+    {% else %}
+      {{ current_time >= sleep_start_time or current_time <= sleep_end_time }}
+    {% endif %}
+  adjust: "{{ 2 if outdoor_temp < 25 else -2 if outdoor_temp > 85 else 0 }}"
+  setpoints:
+    home:
+      heat: 70
+      cool: 75
+    away:
+      heat: 64
+      cool: 79
+    sleep:
+      heat: 66
+      cool: 72
+mode: single
