@@ -1,0 +1,32 @@
+alias: "[Smart Climate] Detect Upstairs Manual HVAC Change"
+description: Sets manual override when user manually adjusts thermostat
+triggers:
+  - entity_id: climate.upstairs_2
+    attribute: temperature
+    trigger: state
+conditions:
+  - condition: state
+    entity_id: input_boolean.climate_upstairs_manual_override
+    state: "off"
+actions:
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.climate_upstairs_recently_changed
+            state: "on"
+        sequence:
+          - target:
+              entity_id: input_boolean.climate_upstairs_recently_changed
+            action: input_boolean.turn_off
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.climate_upstairs_recently_changed
+            state: "off"
+        sequence:
+          - target:
+              entity_id: input_boolean.climate_upstairs_manual_override
+            action: input_boolean.turn_on
+          - target:
+              entity_id: timer.climate_upstairs_manual_override
+            action: timer.start
+mode: single
