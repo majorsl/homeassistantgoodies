@@ -1,0 +1,9 @@
+Input Booleans:
+input_boolean.climate_downstairs_manual_override
+input_boolean.climate_upstairs_manual_override
+input_boolean.climate_downstairs_recently_changed
+input_boolean.climate_upstairs_recently_changed
+
+Timers:
+timer.climate_downstairs_manual_override_timer
+timer.climate_upstairs_manual_override_timer
