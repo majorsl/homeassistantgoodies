@@ -1,0 +1,1 @@
+This is legacy, but an example of 17Track, a sensor, and info panel.  I no longer use it because the USPS closed their api to 17Track so it is useless for me.  Here for good code snippets or for someone to use that doesn't rely on USPS.
