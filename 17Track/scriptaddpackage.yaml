@@ -1,0 +1,25 @@
+alias: Add 17TRACK Package
+mode: single
+sequence:
+  - variables:
+      tracking: >-
+        {{ states('input_text.17track_add_new_number') | trim | replace(' ', '')
+        | replace('-', '') }}
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ tracking | string | length > 0 }}"
+        sequence:
+          - data:
+              config_entry_id: 01KF96MC4BSGS1DGS96H1Q6G0M
+              package_tracking_number: "{{ tracking }}"
+              package_friendly_name: >-
+                {% set chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ' %} {% set
+                out = '' %} {% for i in range(6) %}
+                  {% set out = out ~ chars|random %}
+                {% endfor %} {{ out }}
+            action: seventeentrack.add_package
+          - data:
+              entity_id: input_text.17track_add_new_number
+              value: ""
+            action: input_text.set_value
