@@ -1,0 +1,19 @@
+#alerts
+          {% set packages = state_attr('sensor.17track_package_data','packages') or [] %}
+          {% set packages_delayed = states('sensor.17track_packages_possibly_delayed') | int %}
+          
+                or packages | selectattr('status','in', ['In Transit','Delivered','Not Found']) | list | length > 0
+                or packages_delayed > 0 %}
+
+#color
+            {% set packages = state_attr('sensor.17track_package_data','packages') or [] %}
+            {% set packages_delayed = states('sensor.17track_packages_possibly_delayed') | int %}
+
+            {% elif packages_delayed > 0 %}
+              orange
+            {% elif packages | selectattr('status','eq','Not Found') | list | length > 0 %}
+              gray
+            {% elif packages | selectattr('status','eq','In Transit') | list | length > 0 %}
+              blue
+            {% elif packages | selectattr('status','eq','Delivered') | list | length > 0 %}
+              green
