@@ -1,0 +1,32 @@
+  # --- 17Track Trigger-Based Sensor ---
+  - trigger:
+      - platform: homeassistant
+        event: start
+      - platform: time_pattern
+        minutes: "/30"
+    action:
+      - action: seventeentrack.get_packages
+        response_variable: packages
+        data:
+          config_entry_id: 01KF96MC4BSGS1DGS96H1Q6G0M
+    sensor:
+      - name: "17Track Package Data"
+        state: "{{ packages.packages | length if packages is defined else 0 }}"
+        attributes:
+          packages: "{{ packages.packages if packages is defined else [] }}"
+
+  - sensor:
+      - name: "17Track Packages Possibly Delayed"
+        icon: mdi:clock-alert
+        state: >
+          {% set cutoff = (now() - timedelta(hours=96)).timestamp() %}
+          {% set pkgs = state_attr('sensor.17track_package_data', 'packages') or [] %}
+          {{
+            pkgs
+            | selectattr('status','eq','In Transit')
+            | selectattr('timestamp','defined')
+            | selectattr('timestamp','ne', None)
+            | selectattr('timestamp','lt', cutoff | timestamp_utc)
+            | list
+            | length
+          }}
